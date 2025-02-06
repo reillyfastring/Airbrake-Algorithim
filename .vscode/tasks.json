@@ -1,0 +1,24 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build C",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+              "-g",
+              "${file}",
+              "-o",
+              "${fileDirname}/${fileBasenameNoExtension}.exe"
+            ],
+            "group": {
+              "kind": "build",
+              "isDefault": false
+            },
+            "problemMatcher": [
+              "$gcc"
+            ],
+            "detail": "Compiles the active C file using gcc"
+          }
+        ]
+      }
