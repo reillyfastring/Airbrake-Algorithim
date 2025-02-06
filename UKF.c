@@ -1,9 +1,12 @@
 #include "UKF_Operations.c"
-#define SIZE 13
+#define SIZE 9
 
 int main() {
     //initialize state vector: 
-    double StateVector[n] = {0};
+    double StateVector[SIZE] = {0};
+    
+    //initialize sensor vector:
+    double sensorVector[SIZE] = {0};
 
     //initializing covariance matrix
     double Covariance[SIZE*SIZE] = {0};

@@ -36,3 +36,13 @@ double dotProduct(const int N, const double *X, const int incX, const double *Y,
 
     return result;
 }
+
+double randn() {
+    double u1 = (rand() + 1.0) / (RAND_MAX + 1.0); 
+    double u2 = (rand() + 1.0) / (RAND_MAX + 1.0);
+    return sqrt(-2.0 * log(u1)) * cos(2.0 * PI * u2);
+}
+
+void drag(double theta, double velocity) {
+//function that calculates drag using model points, surface area, and current mach speed.
+}
