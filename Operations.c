@@ -46,3 +46,5 @@ double randn() {
 void drag(double theta, double velocity) {
 //function that calculates drag using model points, surface area, and current mach speed.
 }
+
+Vdot
