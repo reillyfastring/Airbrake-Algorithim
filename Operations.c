@@ -49,3 +49,7 @@ void drag(double theta, double velocity) {
 double rho(double height) {
     return (pow(2116*((59+459.7-.00356*(height*3.281))/518.6), 5.256)/(1718*(59+459.7-.00356*(height*3.281)))*515.4);
 }
+
+double surfaceA(angleOfDeployment) {
+    surfaceA = 0.0182414692475+angleofDeployment*0.00350967*9;
+}
