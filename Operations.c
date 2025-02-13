@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <cblas.h>
 
 void choleskyDecomp(double* A, int n) {
     for (int i = 0; i < n; i++) {
@@ -47,4 +46,6 @@ void drag(double theta, double velocity) {
 //function that calculates drag using model points, surface area, and current mach speed.
 }
 
-Vdot
+double rho(double height) {
+    return (pow(2116*((59+459.7-.00356*(height*3.281))/518.6), 5.256)/(1718*(59+459.7-.00356*(height*3.281)))*515.4);
+}

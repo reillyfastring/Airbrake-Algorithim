@@ -7,7 +7,7 @@
 void processModel(double* A, int n, double* t, double* DeployAngle, double* sensorVector) {
     //drag first(1)-> velocity(1) -> position(1) -> angle(3) -> bias(3)
     for (int i = 1; i < (n+1); i++) {
-        magA = sqrt(pow(sensorVector[1], 2) + pow(sensorVector[2], 2) + pow(sensorVector[3], 2));
+        double magA = sqrt(pow(sensorVector[1], 2) + pow(sensorVector[2], 2) + pow(sensorVector[3], 2));
         //Prediction for dragZ
         sigma[i*SIZE + 1] += drag(theta, sigma[i*SIZE + 2]);
         //prediction for velocityZ
