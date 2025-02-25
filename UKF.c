@@ -5,8 +5,10 @@
 int main() {
     //initialize state vector: 
     double StateVector[SIZE] = {0};
+    double StateMean[SIZE] = {0};
     
     //initialize sensor vector:
+    //gryo, accel, and mag can poll at 100Hz, Gps can poll at 1.15Hz
     double sensorVector[SIZE] = {0};
 
     //initializing covariance matrix
@@ -14,9 +16,15 @@ int main() {
     for(int i = 0; i < SIZE; i++) {
         Covariance[i*SIZE + i] = 1; 
     }
+    double PredictedCovariance[SIZE*SIZE] = {0};
+    for(int i = 0; i < SIZE; i++) {
+        Covariance[i*SIZE + i] = 1; 
+    }
+
 
     //sigma points
     double sigma[(2*SIZE+1)*SIZE];
+    double sigmaPredicted[(2*SIZE+1)*SIZE];
     double weights[(2*SIZE+1)*2];
 
     //Sigma point tuning parameters
