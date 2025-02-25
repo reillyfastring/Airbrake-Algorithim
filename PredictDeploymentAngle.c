@@ -56,6 +56,10 @@ double PredictApogee(double* stateVector, double deploymentAngle) {
         k2_v = -grav -(0.5/MASS)*k2_rho*drag((velocityZ+k1_v*t/2.0), deploymentAngle)*surfaceA(deploymentAngle)*pow((velocityZ+k1_v*t/2.0), 2)*(1.0/math.sin(thetaZ+k1_theta*t/2.0)));
         k2_theta = grav*math.sin(thetaZ+k1_theta*t/2.0)*math.cos(thetaZ+k1_theta*t/2.0)/(velocityZ+k1_v*t/2.0);
 
+        k3_rho = rho(positionZ + velocityZ*t/2);
+        k3_x = positionZ*(velocityZ+k2_v*t/2);
+        k3_v = -grav -(1/2*MASS)*k2_rho*drag((velocityZ+k2_v*t/2), deploymentAngle)*pow((velocityZ+k2_v*t/2), 2)*(1/math.sin(thetaZ+k2_theta*t/2)));
+
         k3_rho = rho(positionZ + velocityZ*t/2.0);
         k3_x = velocityZ+k2_v*t/2.0;
         k3_v = -grav -(0.5/MASS)*k3_rho*drag((velocityZ+k2_v*t/2.0), deploymentAngle)*surfaceA(deploymentAngle)*pow((velocityZ+k2_v*t/2.0), 2)*(1.0/math.sin(thetaZ+k2_theta*t/2.0)));
