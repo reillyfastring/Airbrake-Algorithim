@@ -5,10 +5,6 @@
  #ifndef UKF_H
  #define UKF_H
  
- #ifdef __cplusplus
- extern "C" {
- #endif
- 
  #include <stdlib.h>
  #include <stdio.h>
  #include <math.h>
