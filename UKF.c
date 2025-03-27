@@ -380,9 +380,7 @@
  double drag(double theta, double velocity)
  {
      // dummy function returning a constant or some small model
-     (void)theta;  // unused
-     (void)velocity;
-     return 0.3;
+    return(-0.06828*velocity/343*0.01+.243866*theta+.333907);
  }
  
  //--------------------------------------------------//
@@ -391,10 +389,10 @@
  double rho(double height)
  {
      // Possibly a mock
-     return pow(
-       2116.0*((59.0+459.7-0.00356*(height*3.281))/518.6),
-       5.256
-     ) / (1718.0*(59.0+459.7-0.00356*(height*3.281))) * 515.4;
+     double T = 15.04 - 0.00649 * height;
+     double p = 101.29 * pow((T + 273.1) / 288.08, 5.256);
+     double rho = p / (0.2869 * (T + 273.1));
+     return rho;
  }
  
  //--------------------------------------------------//
@@ -409,127 +407,207 @@
  //--------------------------------------------------//
  // PredictDeploymentAngle
  //--------------------------------------------------//
- double PredictDeploymentAngle(double* stateVector, double previousAngle)
+ double PredictDeploymentAngle(double* stateVector)
  {
-     double deploymentAngle = previousAngle;
-     double LR = 0.001;
-     double beta1 = 0.9;
-     double beta2 = 0.999;
-     double eps = 1e-8;
-     int maxIterations = 1000;
- 
-     double m = 0.0;
-     double v = 0.0;
-     int i = 0;
- 
-     while(cost(deploymentAngle, stateVector) >= 25.0 && i < maxIterations) {
-         double g = computeGrad(deploymentAngle, stateVector, eps);
- 
-         // Adam update
-         m = beta1*m + (1.0 - beta1)*g;
-         v = beta2*v + (1.0 - beta2)*(g*g);
- 
-         double mHat = m / (1.0 - pow(beta1, i+1));
-         double vHat = v / (1.0 - pow(beta2, i+1));
- 
-         deploymentAngle -= LR*mHat / (sqrt(vHat) + eps);
-         i++;
+     double low = 0.0;
+     double high = 1.0;
+     double mid = 0.0;
+     double targetApogee = 0;
+     if (stateVector[2] < 100) {
+        targetApogee = 9144;
      }
-     return deploymentAngle;
- }
- 
- //--------------------------------------------------//
- // cost, computeGrad, PredictApogee
- //--------------------------------------------------//
- double cost(double deploymentAngle, double* stateVector)
- {
-     double predictedApogee = PredictApogee(stateVector, deploymentAngle);
-     double distance = predictedApogee - 30000.0;
-     if (distance > 0.0) {
-         return distance*distance;
-     } else {
-         return distance*distance + 4000.0*4000.0;
+     else {
+        targetApogee = 9144 + (9144 - stateVector[3])/20;
      }
+     // Keep track of how many times we call PredictApogee
+     int predictCalls = 0;
+     double predictedApogee = 0;
+ 
+     // Continue until our angle interval is small enough
+     while ((high - low) > 0.0001)
+     {
+         mid = (low + high) / 2.0;
+         
+         // Call PredictApogee to check how close we are to the target
+         predictedApogee = PredictApogee(stateVector, mid);
+         predictCalls++;
+ 
+         // If we overshoot 9144, we shrink the upper bound; 
+         // otherwise, we shrink the lower bound.
+         if (predictedApogee > targetApogee)
+         {
+             low = mid;
+         }
+         else
+         {
+             high = mid;
+         }
+     }
+ 
+     // Print how many times we called PredictApogee
+     printf("PredictApogee was called %d times.\nThe final Predicted Apogee was %f\n", predictCalls, predictedApogee);
+ 
+     // Return the midpoint of our final [low, high] interval as the "best" angle
+     return (low + high) / 2.0;
  }
  
- double computeGrad(double deploymentAngle, double* stateVector, double epsilon)
- {
-     double costPlus  = cost(deploymentAngle + epsilon, stateVector);
-     double costMinus = cost(deploymentAngle - epsilon, stateVector);
-     return (costPlus - costMinus) / (2.0 * epsilon);
- }
  
  double PredictApogee(double* stateVector, double deploymentAngle)
  {
-     // Example 4th-order RK approach, repeated until velocity <= 0 or maxIterations
+     // Retrieve initial state variables
      double velocityZ = stateVector[2];
      double positionZ = stateVector[3];
      double thetaZ    = stateVector[6];
-     double dt = 0.01;
-     int maxIters = 1000;
+     
+     // Initial timestep guess
+     double dt = 0.3;
+     int maxIters = 10000000;
      int iter = 0;
  
      while(velocityZ > 0.0 && iter < maxIters) {
          // k1
+         if (stateVector[6]*180/M_PI < 20) {
+            deploymentAngle = 0;
+         }
          double k1_rho   = rho(positionZ);
          double k1_x     = velocityZ;
          double k1_v     = -grav
-                           - (0.5/MASS)*k1_rho*drag(deploymentAngle, velocityZ)
-                             * surfaceA(deploymentAngle)
-                             * pow(velocityZ,2)
-                             * (1.0/sin(thetaZ));
-         double k1_theta = grav * sin(thetaZ)*cos(thetaZ)/velocityZ;
+                           - (0.5 / MASS) * k1_rho * drag(deploymentAngle, velocityZ)
+                           * surfaceA(deploymentAngle)
+                           * pow(velocityZ, 2)
+                           * (1.0 / sin(thetaZ));
+         double k1_theta = grav * sin(thetaZ) * cos(thetaZ) / velocityZ;
  
          // k2
-         double vk1 = velocityZ + 0.5*dt*k1_v;
-         double posk1 = positionZ + 0.5*dt*k1_x;
-         double thetaK1 = thetaZ + 0.5*dt*k1_theta;
- 
+         double vk1    = velocityZ + 0.5 * dt * k1_v;
+         double posk1  = positionZ + 0.5 * dt * k1_x;
+         double thetaK1 = thetaZ + 0.5 * dt * k1_theta;
+         
          double k2_rho   = rho(posk1);
          double k2_x     = vk1;
          double k2_v     = -grav
-                           - (0.5/MASS)*k2_rho*drag(deploymentAngle, vk1)
-                             * surfaceA(deploymentAngle)
-                             * pow(vk1,2)
-                             * (1.0/sin(thetaK1));
-         double k2_theta = grav*sin(thetaK1)*cos(thetaK1)/vk1;
+                           - (0.5 / MASS) * k2_rho * drag(deploymentAngle, vk1)
+                           * surfaceA(deploymentAngle)
+                           * pow(vk1, 2)
+                           * (1.0 / sin(thetaK1));
+         double k2_theta = grav * sin(thetaK1) * cos(thetaK1) / vk1;
  
          // k3
-         double vk2 = velocityZ + 0.5*dt*k2_v;
-         double posk2 = positionZ + 0.5*dt*k2_x;
-         double thetaK2 = thetaZ + 0.5*dt*k2_theta;
- 
+         double vk2    = velocityZ + 0.5 * dt * k2_v;
+         double posk2  = positionZ + 0.5 * dt * k2_x;
+         double thetaK2 = thetaZ + 0.5 * dt * k2_theta;
+         
          double k3_rho   = rho(posk2);
          double k3_x     = vk2;
          double k3_v     = -grav
-                           - (0.5/MASS)*k3_rho*drag(deploymentAngle, vk2)
-                             * surfaceA(deploymentAngle)
-                             * pow(vk2,2)
-                             * (1.0/sin(thetaK2));
-         double k3_theta = grav*sin(thetaK2)*cos(thetaK2)/vk2;
+                           - (0.5 / MASS) * k3_rho * drag(deploymentAngle, vk2)
+                           * surfaceA(deploymentAngle)
+                           * pow(vk2, 2)
+                           * (1.0 / sin(thetaK2));
+         double k3_theta = grav * sin(thetaK2) * cos(thetaK2) / vk2;
  
          // k4
-         double vk3 = velocityZ + dt*k3_v;
-         double posk3 = positionZ + dt*k3_x;
-         double thetaK3 = thetaZ + dt*k3_theta;
- 
+         double vk3    = velocityZ + dt * k3_v;
+         double posk3  = positionZ + dt * k3_x;
+         double thetaK3 = thetaZ + dt * k3_theta;
+         
          double k4_rho   = rho(posk3);
          double k4_x     = vk3;
          double k4_v     = -grav
-                           - (0.5/MASS)*k4_rho*drag(deploymentAngle, vk3)
-                             * surfaceA(deploymentAngle)
-                             * pow(vk3,2)
-                             * (1.0/sin(thetaK3));
-         double k4_theta = grav*sin(thetaK3)*cos(thetaK3)/vk3;
+                           - (0.5 / MASS) * k4_rho * drag(deploymentAngle, vk3)
+                           * surfaceA(deploymentAngle)
+                           * pow(vk3, 2)
+                           * (1.0 / sin(thetaK3));
+         double k4_theta = grav * sin(thetaK3) * cos(thetaK3) / vk3;
  
-         // Update
-         positionZ += (k1_x + 2.0*k2_x + 2.0*k3_x + k4_x)*dt/6.0;
-         velocityZ += (k1_v + 2.0*k2_v + 2.0*k3_v + k4_v)*dt/6.0;
-         thetaZ    += (k1_theta + 2.0*k2_theta + 2.0*k3_theta + k4_theta)*dt/6.0;
+         // Update the state using 4th-order Runge-Kutta
+         positionZ += (k1_x + 2.0*k2_x + 2.0*k3_x + k4_x) * dt / 6.0;
+         velocityZ += (k1_v + 2.0*k2_v + 2.0*k3_v + k4_v) * dt / 6.0;
+         thetaZ    -= (k1_theta + 2.0*k2_theta + 2.0*k3_theta + k4_theta) * dt / 6.0;
  
+         // Clamp dt_candidate between 0.01 and 1.5 seconds.
+         if (velocityZ > 343) {
+             dt = .8;
+         }
+         if (velocityZ < 50) {
+             dt = 0.2;
+         }
+         
          iter++;
+         // Optionally print out iteration details for debugging:
+         // printf("Iteration %d: posZ = %f, velocityZ = %f, dt = %f\n", iter, positionZ, velocityZ, dt);
      }
- 
+     
+     //printf("Iterations: %d\n", iter);
      return positionZ;
  }
+
+ double* PredictApogeeSS(double* stateVector, double deploymentAngle, double dt)
+ {
+     // Retrieve initial state variables
+     double velocityZ = stateVector[2];
+     double positionZ = stateVector[3];
+     double thetaZ    = stateVector[6];
+     
+         // k1
+         double k1_rho   = rho(positionZ);
+         double k1_x     = velocityZ;
+         double k1_v     = -grav
+                           - (0.5 / MASS) * k1_rho * drag(deploymentAngle, velocityZ)
+                           * surfaceA(deploymentAngle)
+                           * pow(velocityZ, 2)
+                           * (1.0 / sin(thetaZ));
+         double k1_theta = grav * sin(thetaZ) * cos(thetaZ) / velocityZ;
+ 
+         // k2
+         double vk1    = velocityZ + 0.5 * dt * k1_v;
+         double posk1  = positionZ + 0.5 * dt * k1_x;
+         double thetaK1 = thetaZ + 0.5 * dt * k1_theta;
+         
+         double k2_rho   = rho(posk1);
+         double k2_x     = vk1;
+         double k2_v     = -grav
+                           - (0.5 / MASS) * k2_rho * drag(deploymentAngle, vk1)
+                           * surfaceA(deploymentAngle)
+                           * pow(vk1, 2)
+                           * (1.0 / sin(thetaK1));
+         double k2_theta = grav * sin(thetaK1) * cos(thetaK1) / vk1;
+ 
+         // k3
+         double vk2    = velocityZ + 0.5 * dt * k2_v;
+         double posk2  = positionZ + 0.5 * dt * k2_x;
+         double thetaK2 = thetaZ + 0.5 * dt * k2_theta;
+         
+         double k3_rho   = rho(posk2);
+         double k3_x     = vk2;
+         double k3_v     = -grav
+                           - (0.5 / MASS) * k3_rho * drag(deploymentAngle, vk2)
+                           * surfaceA(deploymentAngle)
+                           * pow(vk2, 2)
+                           * (1.0 / sin(thetaK2));
+         double k3_theta = grav * sin(thetaK2) * cos(thetaK2) / vk2;
+ 
+         // k4
+         double vk3    = velocityZ + dt * k3_v;
+         double posk3  = positionZ + dt * k3_x;
+         double thetaK3 = thetaZ + dt * k3_theta;
+         
+         double k4_rho   = rho(posk3);
+         double k4_x     = vk3;
+         double k4_v     = -grav
+                           - (0.5 / MASS) * k4_rho * drag(deploymentAngle, vk3)
+                           * surfaceA(deploymentAngle)
+                           * pow(vk3, 2)
+                           * (1.0 / sin(thetaK3));
+         double k4_theta = grav * sin(thetaK3) * cos(thetaK3) / vk3;
+ 
+         // Update the state using 4th-order Runge-Kutta
+
+         stateVector[3] += (k1_x + 2.0*k2_x + 2.0*k3_x + k4_x) * dt / 6.0;
+         stateVector[2] += (k1_v + 2.0*k2_v + 2.0*k3_v + k4_v) * dt / 6.0;
+         stateVector[6] -= (k1_theta + 2.0*k2_theta + 2.0*k3_theta + k4_theta) * dt / 6.0;
+
+     //printf("Iterations: %d\n", iter);
+     return stateVector;
+}
  

@@ -91,7 +91,7 @@
  /* ==================== Deployment Angle Optimization ==================== */
  
  /* Predicts an optimal deployment angle using an iterative approach */
- double PredictDeploymentAngle(double* stateVector, double previousAngle);
+ double PredictDeploymentAngle(double* stateVector);
  
  /* Cost function used by PredictDeploymentAngle() */
  double cost(double deploymentAngle, double* stateVector);

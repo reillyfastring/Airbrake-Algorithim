@@ -1,14 +1,29 @@
-#include "ukf.h"
+#include "ukf.c"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+
+#define NOISE_SCALE 0.001
 
 // You might define or retrieve these from somewhere else:
 static const double t = 0.01;             // Timestep
-static double DeployAngle = 0.0;          // Some initial angle if needed
+static double DeployAngle = 0.01;          // Some initial angle if needed
+
+
+double generateGaussianNoise(double mean, double stdDev) {
+    double u1 = (double)rand() / RAND_MAX;
+    double u2 = (double)rand() / RAND_MAX;
+    double z0 = sqrt(-2.0 * log(u1)) * cos(2.0 * M_PI * u2);
+    return z0 * stdDev + mean;
+}
 
 int main(void)
 {
+    srand(time(NULL));
+    FILE *fptr;
+    fptr = fopen("Data.txt", "w");
+    
     // ============= Initialization =============
     
     // State vector: 
@@ -18,13 +33,16 @@ int main(void)
     //   omegaX, omegaY, omegaZ,
     //   gpsX, gpsY, gpsZ ]
     double StateVector[SIZE] = {0.0};
-
+    StateVector[2] = 982.7707*.3048;
+    StateVector[3] = 20071.75*.3048;
+    StateVector[6] = 72.7701/180*M_PI;
+    /*
     double StateMean[SIZE] = {0.0};
     double MeasurementMean[SIZE] = {0.0};   // If your measurement dimension = SIZE/2,
-                                              // you can store it in the first half 
-    double previousAngle = 0.0;
-    double Angle = 0.0;
-    
+    */                                          // you can store it in the first half 
+    double previousAngle = 0;
+    double Angle = 0.00;
+    /*
     // Sensor vector: e.g. [accelX, accelY, accelZ, gyroX, gyroY, gyroZ, gpsX, gpsY, gpsZ]
     // or likewise if it’s 9 elements. Here we keep SIZE=18 for consistency.
     double sensorVector[SIZE] = {0.0};
@@ -149,13 +167,36 @@ int main(void)
 
     // 10) update of covariance matrix
     cholUpdateMulti(covariance, measurementMatrix, SIZE, SIZE/2, -1);
-
+    */
     // 11) Suppose we compute next angle:
-    previousAngle = Angle;
-    Angle = PredictDeploymentAngle(StateVector, previousAngle);
+    double StateVectorAdjusted[SIZE] = {0};
+    double noise = 0.0;
+    double time = 0.0;
+    Angle = PredictDeploymentAngle(StateVector);
+    fprintf(fptr, "Time Position Velocity Angle DeploymentAngle AdjustedPosition AdjustedVelocity AdjustedAngle\n");
+    int counter = 0;
+    while(StateVector[2] > -10 && StateVector[3] < 32000*.3048) {
+        if (counter == 10) {
+            for (int i = 0; i < SIZE; i++) {
+                noise = generateGaussianNoise(0.0, NOISE_SCALE*fabs(StateVector[i]));
+                StateVectorAdjusted[i] = StateVector[i] + noise;
+            }
+            Angle = PredictDeploymentAngle(StateVectorAdjusted);
+        counter = 0;
+        }   
+        if (StateVector[6]*180/M_PI < 20) {
+            PredictApogeeSS(StateVector, 0.00, 0.001);
+            fprintf(fptr, "%f,%f,%f,%f,%f,%f,%f,%f\n", time, StateVector[3], StateVector[2], StateVector[6]*180/M_PI, 0.0, StateVectorAdjusted[3], StateVectorAdjusted[2], StateVectorAdjusted[6]*180/M_PI);
+        }
+        else {
+            PredictApogeeSS(StateVector, Angle, 0.001);
+            fprintf(fptr, "%f,%f,%f,%f,%f,%f,%f,%f\n", time, StateVector[3], StateVector[2], StateVector[6]*180/M_PI, Angle, StateVectorAdjusted[3], StateVectorAdjusted[2], StateVectorAdjusted[6]*180/M_PI);
 
-    printf("Updated angle = %f\n", Angle);
-    printf("Updated state example, posZ = %f\n", StateVector[2]);
+        }
+        time += 0.001;
+        counter += 1;
+    }
 
+    fclose(fptr);
     return 0;
 }
